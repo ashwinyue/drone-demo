@@ -1,0 +1,163 @@
+kind: pipeline
+type: docker
+name: build-and-deploy
+
+steps:
+  # 代码检查和测试
+  - name: test
+    image: golang:1.21-alpine
+    commands:
+      - go mod download
+      - go test ./...
+      - go vet ./...
+    when:
+      event: [push, pull_request]
+
+  # 构建应用
+  - name: build
+    image: golang:1.21-alpine
+    commands:
+      - go mod download
+      - go build -o demo-web-app .
+    when:
+      event: [push, pull_request]
+
+  # 使用 go-drone-deploy 进行 Docker 构建和推送
+  - name: docker-deploy
+    image: solariswu/go-drone-deploy:latest
+    environment:
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+    commands:
+      - echo "Starting Docker build and push..."
+      - /go-drone-deploy -flow=docker -env=${DRONE_DEPLOY_TO:-dev}
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    when:
+      event: [push]
+      branch: [main, develop]
+
+  # 使用 go-drone-deploy 进行 Kubernetes 部署
+  - name: k8s-deploy
+    image: solariswu/go-drone-deploy:latest
+    environment:
+      KUBECONFIG:
+        from_secret: kubeconfig
+    commands:
+      - echo "Starting Kubernetes deployment..."
+      - /go-drone-deploy -flow=k8s -env=${DRONE_DEPLOY_TO:-dev}
+    when:
+      event: [promote]
+      target: [dev, staging, prod]
+
+  # 完整部署流程（开发环境自动部署）
+  - name: full-deploy-dev
+    image: solariswu/go-drone-deploy:latest
+    environment:
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+      KUBECONFIG:
+        from_secret: kubeconfig_dev
+      WEBHOOK_URL:
+        from_secret: webhook_url
+    commands:
+      - echo "Starting full deployment pipeline..."
+      - /go-drone-deploy -flow=full -env=dev
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    when:
+      event: [push]
+      branch: [develop]
+
+  # 生产环境部署（需要手动触发）
+  - name: full-deploy-prod
+    image: solariswu/go-drone-deploy:latest
+    environment:
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+      KUBECONFIG:
+        from_secret: kubeconfig_prod
+      WEBHOOK_URL:
+        from_secret: webhook_url
+    commands:
+      - echo "Starting production deployment..."
+      - /go-drone-deploy -flow=full -env=prod
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    when:
+      event: [promote]
+      target: [prod]
+
+  # 部署通知
+  - name: notify
+    image: solariswu/go-drone-deploy:latest
+    environment:
+      WEBHOOK_URL:
+        from_secret: webhook_url
+    commands:
+      - echo "Sending deployment notification..."
+      - /go-drone-deploy -flow=notify -env=${DRONE_DEPLOY_TO:-dev}
+    when:
+      status: [success, failure]
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+
+---
+# 发布流水线
+kind: pipeline
+type: docker
+name: release
+
+steps:
+  - name: build-release
+    image: golang:1.21-alpine
+    commands:
+      - go mod download
+      - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o demo-web-app .
+      - tar -czf demo-web-app-${DRONE_TAG}-linux-amd64.tar.gz demo-web-app
+    when:
+      event: [tag]
+
+  - name: docker-release
+    image: plugins/docker
+    settings:
+      registry: docker.io
+      repo: demo-web-app
+      tags:
+        - ${DRONE_TAG}
+        - latest
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      event: [tag]
+
+  - name: github-release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_token
+      files:
+        - demo-web-app-${DRONE_TAG}-linux-amd64.tar.gz
+    when:
+      event: [tag]
+
+trigger:
+  event:
+    - push
+    - pull_request
+    - tag
+    - promote

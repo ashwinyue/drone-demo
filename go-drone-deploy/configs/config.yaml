@@ -1,0 +1,60 @@
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+data:
+  database:
+    driver: mysql
+    source: root:root@tcp(127.0.0.1:3306)/test?parseTime=True&loc=Local
+  redis:
+    addr: 127.0.0.1:6379
+    read_timeout: 0.2s
+    write_timeout: 0.2s
+
+deploy:
+  project_name: "go-drone-deploy"
+  author: "drone-team"
+  namespace: "default"
+  version: "v1.0.0"
+  env: "dev"
+  
+  docker:
+    registry: "docker.io"
+    username: ""
+    password: ""
+    image_name: "go-drone-deploy:latest"
+    dockerfile_path: "./Dockerfile"
+    build_context: "."
+  
+  k8s:
+    kubeconfig_path: "~/.kube/config"
+    namespace: "default"
+    deployment_name: "go-drone-deploy"
+    service_name: "go-drone-deploy-service"
+    replicas: 1
+    
+    resources:
+      cpu_request: "100m"
+      memory_request: "128Mi"
+      cpu_limit: "500m"
+      memory_limit: "512Mi"
+    
+    ports:
+      - name: "http"
+        port: 80
+        target_port: 8080
+        protocol: "TCP"
+    
+    env_vars:
+      - name: "ENV"
+        value: "production"
+      - name: "LOG_LEVEL"
+        value: "info"
+  
+  notify:
+    enabled: false
+    webhook_url: ""
+    channel: "#deployment"

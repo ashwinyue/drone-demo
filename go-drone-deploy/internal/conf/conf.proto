@@ -1,0 +1,105 @@
+syntax = "proto3";
+package kratos.api;
+
+option go_package = "go-drone-deploy/internal/conf;conf";
+
+import "google/protobuf/duration.proto";
+
+message Bootstrap {
+  Server server = 1;
+  Data data = 2;
+  Deploy deploy = 3;
+}
+
+message Server {
+  message HTTP {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  message GRPC {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  HTTP http = 1;
+  GRPC grpc = 2;
+}
+
+message Data {
+  message Database {
+    string driver = 1;
+    string source = 2;
+  }
+  message Redis {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration read_timeout = 3;
+    google.protobuf.Duration write_timeout = 4;
+  }
+  Database database = 1;
+  Redis redis = 2;
+}
+
+message Deploy {
+  // 项目基本信息
+  string project_name = 1;
+  string author = 2;
+  string namespace = 3;
+  string version = 4;
+  string env = 5;
+  
+  // Docker 配置
+  Docker docker = 6;
+  
+  // Kubernetes 配置
+  Kubernetes k8s = 7;
+  
+  // 通知配置
+  Notify notify = 8;
+}
+
+message Docker {
+  string registry = 1;
+  string username = 2;
+  string password = 3;
+  string image_name = 4;
+  string dockerfile_path = 5;
+  string build_context = 6;
+}
+
+message Kubernetes {
+  string kubeconfig_path = 1;
+  string namespace = 2;
+  string deployment_name = 3;
+  string service_name = 4;
+  int32 replicas = 5;
+  Resources resources = 6;
+  repeated Port ports = 7;
+  repeated EnvVar env_vars = 8;
+}
+
+message Resources {
+  string cpu_request = 1;
+  string memory_request = 2;
+  string cpu_limit = 3;
+  string memory_limit = 4;
+}
+
+message Port {
+  string name = 1;
+  int32 port = 2;
+  int32 target_port = 3;
+  string protocol = 4;
+}
+
+message EnvVar {
+  string name = 1;
+  string value = 2;
+}
+
+message Notify {
+  bool enabled = 1;
+  string webhook_url = 2;
+  string channel = 3;
+}
