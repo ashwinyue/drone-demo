@@ -17,12 +17,13 @@ spec:
     spec:
       containers:
       - name: demo-web-app
-        image: demo-web-app:latest
+        image: localhost:5000/demo-web-app:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         env:
         - name: APP_ENV
-          value: "production"
+          value: "local"
         - name: APP_VERSION
           value: "v1.0.0"
         - name: PORT
