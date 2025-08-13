@@ -5,7 +5,8 @@ FROM golang:1.21-alpine AS builder
 WORKDIR /app
 
 # 复制 go mod 文件
-COPY go.mod go.sum ./
+COPY go.mod ./
+COPY go.su[m] ./
 
 # 下载依赖
 RUN go mod download
@@ -28,7 +29,7 @@ WORKDIR /root/
 COPY --from=builder /app/demo-web-app .
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 8082
 
 # 运行应用
 CMD ["./demo-web-app"]

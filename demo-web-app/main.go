@@ -27,7 +27,7 @@ var startTime = time.Now()
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8082"
 	}
 
 	version := os.Getenv("APP_VERSION")
